@@ -23,6 +23,23 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/Roboto_700Bold.ttf",
+            "./assets/fonts/Roboto_700Bold_Italic.ttf",
+            "./assets/fonts/Roboto_300Light.ttf",
+            "./assets/fonts/Roboto_300Light_Italic.ttf",
+            "./assets/fonts/Roboto_500Medium.ttf",
+            "./assets/fonts/Roboto_500Medium_Italic.ttf",
+            "./assets/fonts/Roboto_400Regular.ttf",
+            "./assets/fonts/Roboto_100Thin_Italic.ttf",
+            "./assets/fonts/Roboto_100Thin.ttf"
+
+          ]
+        }
+      ],
       "expo-router",
       [
         "expo-splash-screen",
