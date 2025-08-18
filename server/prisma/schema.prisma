@@ -4,54 +4,113 @@
 // Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
+/**
+ * Prisma Schema for TrimTime Application
+ * 
+ * Database schema defining the data models for users, barbers, and appointments.
+ * Features: user management, barber profiles, appointment scheduling, relationship management.
+ */
+
+// ===== GENERATOR CONFIGURATION =====
+
 generator client {
   provider = "prisma-client-js"
 }
+
+// ===== DATABASE CONNECTION =====
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
+// ===== DATA MODELS =====
+
+/**
+ * User Model
+ * 
+ * Represents individual users who can book appointments with barbers.
+ * Stores personal information, hair type preferences, and location data.
+ */
 model User {
+  // ===== IDENTIFICATION =====
   id            String          @id @default(cuid())
+  
+  // ===== PERSONAL INFORMATION =====
   email         String          @unique
-  passwordHash  String          
+  passwordHash  String          // Hashed password for security
   name          String
-  hairType      String
-  location      String
+  hairType      String          // Hair type classification (4a, 4b, 4c, etc.)
+  location      String          // User's location for barber matching
+  
+  // ===== TIMESTAMPS =====
   createdAt     DateTime        @default(now())
+  
+  // ===== RELATIONSHIPS =====
   appointments  Appointment[]   @relation("UserAppointments")
 
+  // ===== DATABASE MAPPING =====
   @@map("users")
 }
 
+/**
+ * Barber Model
+ * 
+ * Represents barbers who provide services and can receive appointments.
+ * Stores business information, specialties, and ratings.
+ */
 model Barber {
+  // ===== IDENTIFICATION =====
   id            String          @id @default(cuid())
+  
+  // ===== PERSONAL INFORMATION =====
   email         String          @unique
-  passwordHash  String          
+  passwordHash  String          // Hashed password for security
   name          String
-  businessName  String
-  location      String
-  specialties   String[]
-  rating        Float?          @default(0)
+  
+  // ===== BUSINESS INFORMATION =====
+  businessName  String          // Name of the barber shop or business
+  location      String          // Business location for customer discovery
+  specialties   String[]        // Array of hair types the barber specializes in
+  rating        Float?          @default(0) // Customer rating (0-5 scale)
+  
+  // ===== TIMESTAMPS =====
   createdAt     DateTime        @default(now())
+  
+  // ===== RELATIONSHIPS =====
   appointments Appointment[]    @relation("BarberAppointments")
 
+  // ===== DATABASE MAPPING =====
   @@map("barbers")
 }
 
+/**
+ * Appointment Model
+ * 
+ * Represents scheduled appointments between users and barbers.
+ * Tracks appointment details, status, and timing information.
+ */
 model Appointment {
+  // ===== IDENTIFICATION =====
   id              String          @id @default(cuid())
-  userId          String
-  barberId        String
-  appointmentDate DateTime
-  status          String          @default("booked")
+  
+  // ===== RELATIONSHIP REFERENCES =====
+  userId          String          // Reference to the user booking the appointment
+  barberId        String          // Reference to the barber providing the service
+  
+  // ===== APPOINTMENT DETAILS =====
+  appointmentDate DateTime        // Scheduled date and time of the appointment
+  serviceType     String          @default("Haircut") // Type of service requested
+  notes           String          @default("") // Additional notes or special requests
+  status          String          @default("booked") // Current status (booked, confirmed, completed, cancelled)
+  
+  // ===== TIMESTAMPS =====
   createdAt       DateTime        @default(now())
 
-
+  // ===== RELATIONSHIPS =====
   user       User     @relation("UserAppointments", fields: [userId], references: [id])
-  barber     Barber   @relation("BarberAppointments",   fields: [barberId], references: [id])
+  barber     Barber   @relation("BarberAppointments", fields: [barberId], references: [id])
 
+  // ===== DATABASE MAPPING =====
   @@map("appointments")
 }

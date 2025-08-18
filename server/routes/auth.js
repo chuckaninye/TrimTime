@@ -1,3 +1,10 @@
+/**
+ * auth.js
+ *
+ * Express router for user and barber authentication endpoints.
+ * Features: registration, login, password hashing, JWT token generation.
+ */
+
 const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcryptjs");
@@ -6,10 +13,16 @@ const jwt = require("jsonwebtoken");
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
+/**
+ * POST /register - Register a new user account
+ * Body: { name, email, password, hairType, location? }
+ * Returns: User object with JWT token (password hash excluded)
+ */
 router.post("/register", async (req, res) => {
 	try {
-		const { email, password, name, hairType, location } = req.body;
+		const { name, email, password, hairType, location } = req.body;
 
+		// Check if user already exists
 		const existingUser = await prisma.user.findUnique({
 			where: { email },
 		});
@@ -17,42 +30,57 @@ router.post("/register", async (req, res) => {
 		if (existingUser) {
 			return res.status(400).json({ error: "User already exists" });
 		}
+
+		// Hash password for security
 		const saltRounds = 10;
 		const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-		const newUser = await prisma.user.create({
+		// Create new user
+		const user = await prisma.user.create({
 			data: {
+				name,
 				email,
 				passwordHash: hashedPassword,
-				name,
 				hairType,
-				location,
+				location: location || "",
 			},
 		});
 
-		const token = jwt.sign(
-			{ userId: newUser.id, email: newUser.email },
-			process.env.JWT_SECRET,
-			{ expiresIn: "24h" }
-		);
+		// Generate JWT token
+		const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, {
+			expiresIn: "24h",
+		});
 
-		const { passwordHash, ...userWithoutPassword } = newUser;
-
+		// Return user data (excluding password hash) and token
+		const { passwordHash, ...userWithoutPassword } = user;
 		res.status(201).json({
-			message: "User registered successfully",
 			user: userWithoutPassword,
 			token,
 		});
 	} catch (error) {
+		console.error("User registration error:", error);
 		res.status(500).json({ error: "Failed to register user" });
 	}
 });
 
+/**
+ * POST /register-barber - Register a new barber account
+ * Body: { name, email, password, phone?, businessName, location, specialties }
+ * Returns: Barber object with JWT token (password hash excluded)
+ */
 router.post("/register-barber", async (req, res) => {
 	try {
-		const { email, password, name, businessName, location, specialties } =
-			req.body;
+		const {
+			name,
+			email,
+			password,
+			phone,
+			businessName,
+			location,
+			specialties,
+		} = req.body;
 
+		// Check if barber already exists
 		const existingBarber = await prisma.barber.findUnique({
 			where: { email },
 		});
@@ -61,105 +89,119 @@ router.post("/register-barber", async (req, res) => {
 			return res.status(400).json({ error: "Barber already exists" });
 		}
 
+		// Hash password for security
 		const saltRounds = 10;
 		const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-		const newBarber = await prisma.barber.create({
+		// Create new barber
+		const barber = await prisma.barber.create({
 			data: {
+				name,
 				email,
 				passwordHash: hashedPassword,
-				name,
+				phone: phone || "",
 				businessName,
 				location,
-				specialties: specialties || [],
+				specialties,
+				rating: 0,
 			},
 		});
 
-		const token = jwt.sign(
-			{ barberId: newBarber.id, email: newBarber.email },
-			process.env.JWT_SECRET,
-			{ expiresIn: "24h" }
-		);
+		// Generate JWT token
+		const token = jwt.sign({ barberId: barber.id }, process.env.JWT_SECRET, {
+			expiresIn: "24h",
+		});
 
-		const { passwordHash, ...barberWithoutPassword } = newBarber;
-
+		// Return barber data (excluding password hash) and token
+		const { passwordHash, ...barberWithoutPassword } = barber;
 		res.status(201).json({
-			message: "Barber registered successfully",
 			barber: barberWithoutPassword,
 			token,
 		});
 	} catch (error) {
+		console.error("Barber registration error:", error);
 		res.status(500).json({ error: "Failed to register barber" });
 	}
 });
 
+/**
+ * POST /login - Authenticate existing user
+ * Body: { email, password }
+ * Returns: User object with JWT token (password hash excluded)
+ */
 router.post("/login", async (req, res) => {
 	try {
 		const { email, password } = req.body;
 
+		// Find user by email
 		const user = await prisma.user.findUnique({
 			where: { email },
 		});
 
 		if (!user) {
-			return res.status(401).json({ error: "Invalid credentials" });
+			return res.status(400).json({ error: "Invalid credentials" });
 		}
 
-		const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
-
-		if (!isPasswordValid) {
-			return res.status(401).json({ error: "Invalid credentials" });
+		// Verify password
+		const isValidPassword = await bcrypt.compare(password, user.passwordHash);
+		if (!isValidPassword) {
+			return res.status(400).json({ error: "Invalid credentials" });
 		}
 
-		const token = jwt.sign(
-			{ userId: user.id, email: user.email },
-			process.env.JWT_SECRET,
-			{ expiresIn: "24h" }
-		);
+		// Generate JWT token
+		const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, {
+			expiresIn: "24h",
+		});
 
+		// Return user data (excluding password hash) and token
 		const { passwordHash, ...userWithoutPassword } = user;
-
-		res.json({ message: "Login successful", user: userWithoutPassword, token });
+		res.json({
+			user: userWithoutPassword,
+			token,
+		});
 	} catch (error) {
+		console.error("User login error:", error);
 		res.status(500).json({ error: "Failed to login" });
 	}
 });
 
-router.post("/login/barber", async (req, res) => {
+/**
+ * POST /login-barber - Authenticate existing barber
+ * Body: { email, password }
+ * Returns: Barber object with JWT token (password hash excluded)
+ */
+router.post("/login-barber", async (req, res) => {
 	try {
 		const { email, password } = req.body;
 
+		// Find barber by email
 		const barber = await prisma.barber.findUnique({
 			where: { email },
 		});
 
 		if (!barber) {
-			return res.status(401).json({ error: "Invalid credentials" });
+			return res.status(400).json({ error: "Invalid credentials" });
 		}
 
-		const isPasswordValid = await bcrypt.compare(password, barber.passwordHash);
-
-		if (!isPasswordValid) {
-			return res.status(401).json({ error: "Invalid credentials" });
+		// Verify password
+		const isValidPassword = await bcrypt.compare(password, barber.passwordHash);
+		if (!isValidPassword) {
+			return res.status(400).json({ error: "Invalid credentials" });
 		}
 
-		const token = jwt.sign(
-			{
-				barberId: barber.id,
-				email: barber.email,
-			},
-			process.env.JWT_SECRET,
-			{ expiresIn: "24h" }
-		);
+		// Generate JWT token
+		const token = jwt.sign({ barberId: barber.id }, process.env.JWT_SECRET, {
+			expiresIn: "24h",
+		});
 
+		// Return barber data (excluding password hash) and token
 		const { passwordHash, ...barberWithoutPassword } = barber;
-
 		res.json({
-			message: "Login successful",
 			barber: barberWithoutPassword,
 			token,
 		});
 	} catch (error) {
+		console.error("Barber login error:", error);
 		res.status(500).json({ error: "Failed to login" });
 	}
 });
